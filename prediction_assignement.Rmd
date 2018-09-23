@@ -1,0 +1,125 @@
+---
+title: "prediction - Pratical Machine learning"
+author: "Aly TIMITE"
+date: "23/09/2018"
+output: html_document
+---
+
+### Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+## Loading data from source
+
+We have to download data from following sources:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv for training data
+and
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv for testing data.
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.
+
+
+
+```{r}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+```
+After downloading different libraries for our needs, let's get different files from sources
+
+```{r}
+trainingURL <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testingURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+training_data <- read.csv(url(trainingURL))
+testing_data <- read.csv(url(testingURL))
+
+```
+
+## DATA CLEANING
+
+for cleaning data, these are the following steps:
+1- Remove the 7 first features in testing data since they are related to time-series
+2- Remove all columns that contains NA and remove features that are not in the testing dataset.
+3- The features containing NA are the variance, mean and standard devition (SD) within each window for each feature. Since the testing dataset has no time-dependence, these values are useless and can be disregarded.
+
+```{r}
+clean <- names(testing_data[,colSums(is.na(testing_data)) == 0])[8:59]
+
+# Only use "clean"  used in testing cases.
+training_data <- training_data[,c(clean,"classe")]
+testing_data <- testing_data[,c(clean,"problem_id")]
+
+dim(training_data); dim(testing_data)
+```
+##Data Partitioning
+
+We will split our data into a training data set (60% of the total cases) and a testing data set (40% of the total cases; the latter should not be confused with the data in the testing file). 
+
+```{r}
+set.seed(1000)
+
+Train <- createDataPartition(training_data$classe, p=0.6, list=FALSE)
+trainingset <- training_data[Train,]
+testingset <- training_data[-Train,]
+
+dim(trainingset); dim(testingset)
+
+
+```
+
+##Decision Tree Model building
+
+We should expect the accuracy of this model to be around 80%
+
+```{r}
+DTfit <- rpart(classe ~ ., data = trainingset, method="class")
+fancyRpartPlot(DTfit)
+```
+
+##Predicting with the Decision Tree Model
+
+```{r}
+set.seed(1000)
+
+prediction <- predict(DTfit, testingset, type = "class")
+confusionMatrix(prediction, testingset$classe)
+```
+
+##Random Forest model building
+
+With random forest model, we should expect prediction error under 3%
+
+```{r}
+set.seed(1000)
+RFfit <- randomForest(classe ~ ., data = trainingset, ntree = 1000)
+```
+
+##Predicting with the Random Forest Model
+
+```{r}
+prediction1 <- predict(RFfit, testingset, type = "class")
+confusionMatrix(prediction1, testingset$classe)
+```
+##Predicting on the Testing Data
+
+###Decision Tree Prediction
+```{r}
+DTprediction <- predict(DTfit, testing_data, type = "class")
+DTprediction
+```
+
+##Random Forest Prediction
+```{r}
+RFprediction <- predict(RFfit, testing_data, type = "class")
+RFprediction 
+```
+
+
+##Conclusion
+
+As we can we from the result, the random forest algorithm far outperforms the decision tree in terms of accuracy. We are getting 99.25% in sample accuracy, while the decision tree gives us only nearly 50% in sample accuracy
+
